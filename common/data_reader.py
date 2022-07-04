@@ -8,10 +8,10 @@ dirpath = os.pardir
 import sys
 
 sys.path.append(dirpath)
-from common.utils import unfold_label, shuffle_data, my_fft, my_fft_trans
+from common.utils import shuffle_data, my_fft, my_fft_trans
 
 
-class BatchImageGenerator: #类似于datasets的函数
+class BatchImageGenerator:
     def __init__(self, flags, stage, file_path, b_unfold_label):
 
         if stage not in ['train', 'val', 'test']:
@@ -21,16 +21,15 @@ class BatchImageGenerator: #类似于datasets的函数
         self.load_data(b_unfold_label)
 
     def configuration(self, flags, stage, file_path):
-        self.batch_size = flags.batch_size #批的大小
-        self.file_path = file_path  #存储图片的路径：hdf5格式
+        self.batch_size = flags.batch_size
+        self.file_path = file_path
         self.stage = stage 
         self.flags = flags 
         self.nums_d = len(self.file_path)
-        self.current_indexs = [-1 for _ in range(self.nums_d)]  #设置当前的索引
+        self.current_indexs = [-1 for _ in range(self.nums_d)]
 
 
-    def normalize(self, inputs): #修改了，返回原始数据了0-1表示
-
+    def normalize(self, inputs):
         # the mean and std used for the normalization of
         # the inputs for the pytorch pretrained model
         mean = [0.485, 0.456, 0.406]
@@ -39,15 +38,15 @@ class BatchImageGenerator: #类似于datasets的函数
         # norm to [0, 1]
         inputs = inputs / 255.0
 
-        inputs_norm = [] #注释了
+        inputs_norm = []
         for item in inputs:
-            item = np.transpose(item, (2, 0, 1)) #变成channel h w？
+            item = np.transpose(item, (2, 0, 1)) #HWC to CHW
             item_norm = []
             for c, m, s in zip(item, mean, std):
                 c = np.subtract(c, m)
                 c = np.divide(c, s)
                 item_norm.append(c)
-            item_norm = np.stack(item_norm) #stack默认axis=0
+            item_norm = np.stack(item_norm)
             inputs_norm.append(item_norm)
 
         return np.stack(inputs_norm)
@@ -60,13 +59,13 @@ class BatchImageGenerator: #类似于datasets的函数
             x = x.astype(np.uint8)
             img = np.array(Image.fromarray(x).resize((224, 224)))
 
-            return img  #只对第0维和第1维调制大小
+            return img
         
         self.images = [[] for _ in range(self.nums_d)]
         self.labels = [[] for _ in range(self.nums_d)]
         
         for d_index in range(self.nums_d):
-            f = h5py.File(self.file_path[d_index], "r") #h5py读取.h5py
+            f = h5py.File(self.file_path[d_index], "r")
             print(len(f['images']))
             images = np.array(list(map(resize, np.array(f['images']))))            
             self.images[d_index] = self.normalize(images)
@@ -86,14 +85,14 @@ class BatchImageGenerator: #类似于datasets的函数
                 self.images[d_index], self.labels[d_index] = \
                                 shuffle_data(samples=self.images[d_index], labels=self.labels[d_index])
 
-    def get_images_labels_batch(self, domain_index): #修改了,添加了decoder的label
+    def get_images_labels_batch(self, domain_index):
 
         images = []
         labels = []
         H = []
         L = []
         for index in range(self.batch_size):
-            self.current_indexs[domain_index]+=1  #初始值为-1
+            self.current_indexs[domain_index]+=1
             # void over flow
             if self.current_indexs[domain_index] > self.file_num_trains[domain_index] - 1:
                 self.current_indexs[domain_index] %= self.file_num_trains[domain_index]
@@ -120,10 +119,6 @@ class BatchImageGenerator: #类似于datasets的函数
         images = np.stack(images)
         labels = np.stack(labels)
         H = np.stack(H)
-        L = np.stack(L)
-        print(images.shape)
-        print(labels.shape)
-        print(H.shape) 
-        print(L.shape)        
+        L = np.stack(L)     
         return images, labels, H, L
 

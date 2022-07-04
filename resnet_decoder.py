@@ -1,19 +1,12 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-class UnFlatten(nn.Module):
-    def forward(self,input):
-        return input.view(input.size(0),512,4,4)
-
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
 
 def Upsample2d(in_planes, out_planes, stride=2):
-    """3x3 convolution with padding"""
-
     return nn.Upsample(scale_factor=2, mode="nearest")
 
 
@@ -31,7 +24,7 @@ class BasicBlock(nn.Module):
         self.conv1 = conv3x3(inplanes, planes)
         self.bn1 = nn.BatchNorm2d(planes)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = Upsample2d(inplanes, inplanes) #放大两倍
+        self.conv2 = Upsample2d(inplanes, inplanes)
         self.bn2 = nn.BatchNorm2d(inplanes)
         self.upsample = upsample
         self.stride = stride
@@ -39,24 +32,20 @@ class BasicBlock(nn.Module):
 
     def forward(self, x):
         residual = x
+
         if self.upsample is not None:
             residual_temp = self.upsample(x)
             residual = self.conv0_0(residual_temp)
             residual = self.bn0_0(residual)
-            print("decoder的输入：",residual.shape, x.shape)
-
-            print("进行了上采样！！！！！")
             
         if self.flag:
             x = self.conv2(x)
             x = self.conv0_1(x)
             x = self.bn0_1(x)
-            print("decoder的输入：",residual.shape, x.shape)
             
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        print("decoder的输入：",residual.shape, x.shape)
 
         out = x + residual
 
@@ -66,17 +55,15 @@ class BasicBlock(nn.Module):
 class ResNetDecoder(nn.Module):
 
     def __init__(self, block, layers):
-        self.inplanes = 512 #resnet输出层的channel  #改通道数
+        self.inplanes = 512
         super(ResNetDecoder, self).__init__()
         
         self.conv_end = nn.Conv2d(64,3,kernel_size=3,stride=1,padding=1)
-#         self.conv_end_bn = nn.BatchNorm2d(3)
             
-        self.layer0 = self._make_layer(block, 512, layers[0]) #改通道数,不改了，就是将通道固定为256（即使采样的通道是512）
+        self.layer0 = self._make_layer(block, 512, layers[0])
         self.layer1 = self._make_layer(block, 256, layers[1])
         self.layer2 = self._make_layer(block, 128, layers[2])
         self.layer3 = self._make_layer(block, 64, layers[3])
-#         self.layer4 = self._make_layer(block, 3, layers[3])
         
         self.tanh = nn.Tanh()
         self.sigmoid = nn.Sigmoid()
@@ -114,16 +101,11 @@ class ResNetDecoder(nn.Module):
         x = self.layer3(x) #B×64×112×112
 
         x = self.conv_end(x)
-        out = self.sigmoid(x) #高频图像的输入经过预处理是0与1的离散值
+        out = self.sigmoid(x)
 
         return out
 
 def resnet18_decoder(pretrained=False):
-    """Constructs a ResNet-18 model.
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
     model = ResNetDecoder(BasicBlock, [2, 2, 2, 2])
     return model
 

@@ -9,7 +9,7 @@ from torch.autograd import Variable
 from torch.optim import lr_scheduler
 
 import resnet_vanilla_updata
-from common.data_reader import BatchImageGenerator #change
+from common.data_reader import BatchImageGenerator
 from common.utils import *
 import cv2
 
@@ -31,10 +31,9 @@ class ModelAggregate:
 
     def setup(self, flags):
         
-        model = resnet_vanilla_updata.resnet18(pretrained=True, num_classes=flags.num_classes, num_domains=flags.num_domains, flags=flags)
+        model = resnet_vanilla_updata.resnet18(pretrained=True, num_classes=flags.num_classes, flags=flags)
     
         if torch.cuda.is_available():
-#             model = model.cuda()
             if torch.cuda.device_count()>1:
                 model = torch.nn.DataParallel(model)
             self.network = model.cuda()
@@ -51,7 +50,6 @@ class ModelAggregate:
         flags_log = os.path.join(flags.logs, 'flags_log.txt')
         write_log(flags, flags_log)
 
-#         self.load_state_dict(flags, self.network)
 
     def setup_path(self, flags):
 
@@ -136,14 +134,23 @@ class ModelAggregate:
             # 3. load the new state dict
             nn.load_state_dict(model_dict)
 
+
     def configure(self, flags):
 
-        if torch.cuda.is_available():
+        if torch.cuda.device_count()>1:
             base_params = list(map(id, self.network.module.fc.parameters()))
             logits_params = filter(lambda p: id(p) not in base_params, self.network.module.parameters())
             params = [
               {"params": logits_params, "lr": flags.lr[0]},
               {"params": self.network.module.fc.parameters(), "lr": flags.lr[1]},
+            ]
+            self.opt_network = torch.optim.SGD(params, weight_decay=flags.weight_decay, momentum=flags.momentum)
+        else:
+            base_params = list(map(id, self.network.fc.parameters()))
+            logits_params = filter(lambda p: id(p) not in base_params, self.network.parameters())
+            params = [
+              {"params": logits_params, "lr": flags.lr[0]},
+              {"params": self.network.fc.parameters(), "lr": flags.lr[1]},
             ]
             self.opt_network = torch.optim.SGD(params, weight_decay=flags.weight_decay, momentum=flags.momentum)
 
@@ -164,7 +171,6 @@ class ModelAggregate:
 
             # get the inputs and labels from the data reader
             total_loss = 0.0
-            loss_C_all = 0.0
             flag = 0 #是否拼接的标志
             for index in range(flags.num_domains):
                 images_train, labels_train, H, L = self.batImageGenTrains.get_images_labels_batch(index)
@@ -185,29 +191,19 @@ class ModelAggregate:
                     inputs, labels, H, L = Variable(inputs, requires_grad=False).cpu(), \
                                  Variable(labels, requires_grad=False).long().cpu(), \
                                     Variable(H, requires_grad=False).cpu(), \
-                                    Variable(L, requires_grad=False).cpu()
-                print('labels ',labels)
-                
+                                    Variable(L, requires_grad=False).cpu()                
                 # forward with the adapted parameters
-                outputs_lc, outputs_hc, outputs_L, outputs_H = self.network(x=inputs, types='L')
-                                    
-                print('outputs_H.shape ',outputs_H.shape)
-                print('H.shape ',H.shape)
-                print('outputs_lc',outputs_lc.shape)
+                outputs_l_c_a, outputs_h_c_a, outputs_L, outputs_H = self.network(x=inputs, types='freq')
                 
-                #高频频特征学习
-                loss_H_mse = self.loss_fn_MSE(outputs_H, H) #仅使用交叉熵
-#                 loss_H_bce = self.loss_fn_BCE(outputs_H, H) #outputs需要先经过sigmoid
-#                 loss_H = loss_H_mse + loss_H_bce
+                #高频特征学习
+                loss_H_mse = self.loss_fn_MSE(outputs_H, H)
                 
-                #高频频特征学习
-                loss_L_mse = self.loss_fn_MSE(outputs_L, L) #仅使用交叉熵
-#                 loss_L_bce = self.loss_fn_BCE(outputs_L, L) #outputs需要先经过sigmoid
-#                 loss_L = loss_L_mse + loss_L_bce
+                #低频特征学习
+                loss_L_mse = self.loss_fn_MSE(outputs_L, L)
                 
-                loss_C = self.loss_fn_CE(outputs_lc, labels) + self.loss_fn_CE(outputs_hc, labels)
+                loss_C_A = self.loss_fn_CE(outputs_l_c_a, labels) + self.loss_fn_CE(outputs_h_c_a, labels)
                 
-                total_loss = loss_C + total_loss + loss_H_mse + loss_L_mse
+                total_loss = total_loss + loss_C_A + loss_H_mse + loss_L_mse
                 
                 if flag == 0:
                     data, image_labels = inputs, labels
@@ -216,76 +212,33 @@ class ModelAggregate:
                     data, image_labels = \
                     torch.cat((data,inputs),0),\
                     torch.cat((image_labels,labels),0)
-    
-                #进行图像绘制
-                if ite % 100 == 0:# and ite is not 0:
-                    recon_image_H = outputs_H[0].detach().clone()
-                    src_image_H = H[0].detach().clone()
-                    recon_image_L = outputs_L[0].detach().clone()
-                    src_image_L = L[0].detach().clone()
-                    src_image = inputs[0].detach().clone()
-                    
-                    recon_image_H = np.array(recon_image_H.cpu())*255 #逆预处理：0-1 -> 0-255
-                    src_image_H = np.array(src_image_H.cpu())*255 #逆预处理：0-1 -> 0-255
-                    recon_image_L = np.array(recon_image_L.cpu())*255 #逆预处理：0-1 -> 0-255
-                    src_image_L = np.array(src_image_L.cpu())*255 #逆预处理：0-1 -> 0-255
-                    
-                    src_image = np.array(src_image.cpu())#.permute(1,2,0),dtype=np.float32)[:,:,(2,1,0)]
-                    
-                    image_src = []
-                    for ss, m, s in zip(src_image, self.mean, self.std):
-                        
-                        #源输入图像进行逆预处理
-                        ss = np.array(ss * s)
-                        ss = np.array(ss + m)
-                        ss = ss * 255
-                        
-                        image_src.append(ss)
-    
-                    image_src = np.stack(image_src) #stack默认axis=0
-
-                    image_src = np.array(image_src.transpose((1,2,0)),dtype=np.float32)[:,:,(2,1,0)]
-                    recon_H = np.array(recon_image_H.transpose((1,2,0)),dtype=np.float32)[:,:,(2,1,0)]
-                    image_H = np.array(src_image_H.transpose((1,2,0)),dtype=np.float32)[:,:,(2,1,0)]
-                    recon_L = np.array(recon_image_L.transpose((1,2,0)),dtype=np.float32)[:,:,(2,1,0)]
-                    image_L = np.array(src_image_L.transpose((1,2,0)),dtype=np.float32)[:,:,(2,1,0)]
-                    
-                    cv2.imwrite(flags.image_path + os.sep + "L_epoch_{}_{}.png".format(ite,index),recon_L)
-                    cv2.imwrite(flags.image_path + os.sep + "src_L_epoch_{}_{}.png".format(ite,index),image_L)
-                    cv2.imwrite(flags.image_path + os.sep + "H_epoch_{}_{}.png".format(ite,index),recon_H)
-                    cv2.imwrite(flags.image_path + os.sep + "src_H_epoch_{}_{}.png".format(ite,index),image_H)
-                    cv2.imwrite(flags.image_path + os.sep + "src_epoch_{}_{}.png".format(ite,index),image_src)
             
             # init the grad to zeros first
             self.opt_network.zero_grad()
             # backward your network
             total_loss.backward()
-#             # optimize the parameters
-#             self.opt_network.step()
     
             shuffle_index = torch.randperm(len(image_labels))
             data, image_labels = data[shuffle_index], image_labels[shuffle_index]
             
-            outputs_hc, _ = self.network(x=data, types='H')
-            loss_C_h = self.loss_fn_CE(outputs_hc, image_labels)
-            
-#             # init the grad to zeros first
-#             self.opt_network.zero_grad()
+            outputs_c_i, _ = self.network(x=data, types='cls')
+            loss_C_I = self.loss_fn_CE(outputs_c_i, image_labels)
+
             # backward your network
-            loss_C_h.backward()
+            loss_C_I.backward()
             # optimize the parameters
             self.opt_network.step()
 
             flags_log = os.path.join(flags.logs, 'loss_log.txt')
             write_log(
-                "total_loss:" + str(total_loss.item()) + "  loss_C:" +str(loss_C_h.item()),
+                "total_loss:" + str(total_loss.item()) + "  loss_C:" +str(loss_C_I.item()),
                 flags_log)    
 
             self.scheduler.step(epoch=ite)
             
             if ite < 500 or ite % 500 == 0:
                 print(
-                    'ite:', ite, 'total loss:', total_loss.cpu().item(),
+                    'ite:', ite, 'total loss:', total_loss.cpu().item()+loss_C_I.cpu().item(),
                     'lr:', self.opt_network.param_groups[0]['lr'])
                 
             if ite % flags.test_every == 0 and ite is not 0: 
@@ -360,7 +313,7 @@ class ModelAggregate:
                     images_test = Variable(torch.from_numpy(np.array(test_image_split, dtype=np.float32))).cuda()
                 else:
                     images_test = Variable(torch.from_numpy(np.array(test_image_split, dtype=np.float32))).cpu()
-                tuples = self.network(images_test, 'H')
+                tuples = self.network(images_test, 'cls')
                 
                 predictions = tuples[1]['Predictions']
                 predictions = predictions.cpu().data.numpy()
@@ -374,7 +327,7 @@ class ModelAggregate:
             else:
                 images_test = Variable(torch.from_numpy(np.array(images_test, dtype=np.float32))).cpu()
 
-            tuples = self.network(images_test, 'H')
+            tuples = self.network(images_test, 'cls')
 
             predictions = tuples[1]['Predictions']
             predictions = predictions.cpu().data.numpy()

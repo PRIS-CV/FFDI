@@ -1,6 +1,6 @@
 import argparse
 
-from model_resnet_all import ModelAggregate   #change
+from model_resnet_all import ModelAggregate
 
 
 def main():
@@ -31,22 +31,20 @@ def main():
                                   help='保存模型地址的目录')
     train_arg_parser.add_argument("--state_dict", type=str, default='',
                                   help='起始模型的地址')
-    train_arg_parser.add_argument("--data_root", type=str, default='/data2/wangjingye/DG/datasets/PACS_DataSet/Train_val_splits_and_h5py_files_pre-read',
+    train_arg_parser.add_argument("--data_root", type=str, default='./datasets/PACS_DataSet/Train_val_splits_and_h5py_files_pre-read',
                                   help='数据集的目录')
-    train_arg_parser.add_argument("--image_path",type=str,default = "decoder_112_H_L",
-                                  help='保存decoder生成的图片地址')
     train_arg_parser.add_argument("--threshold",type=int, default=25,
                                   help='保存decoder生成的图片地址')
     
     args = train_arg_parser.parse_args()
     
-    index = [3,1,2,0]
+    index = [0,1,2,3]
     styles = ['art','cartoon','photo','sketch',]
-    for x in range(10):
+    for times in range(3):
         for i in index:
             args.unseen_index = i
-            args.logs = 'logs_PoolFPN/{}/attack_{}'.format(str(x),styles[i])
-            args.model_path = 'logs_PoolFPN/{}/attack_{}_model'.format(str(x),styles[i])
+            args.logs = 'logs_PACS/{}/attack_{}'.format(str(times),styles[i])
+            args.model_path = 'logs_PACS/{}/attack_{}_model'.format(str(times),styles[i])
             model_obj = ModelAggregate(flags=args)
             model_obj.train(flags=args)
 

@@ -1,14 +1,12 @@
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 import torch.nn.functional as F
-# from resnet_decoder_all import *
 from resnet_decoder import *
 import torch
 from torch.autograd import Variable
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
-    'resnet50': 'https://download.pytorch.org/models/resnet50-19c8e357.pth',
 }
 
 class Flatten(nn.Module):
@@ -68,7 +66,7 @@ class BasicBlock(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, num_classes, num_domains, flags):
+    def __init__(self, block, layers, num_classes, flags):
         self.inplanes = 64
         self.flags = flags
         super(ResNet, self).__init__()
@@ -81,20 +79,20 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
-        self.fc = nn.Linear(512, num_classes)  #改通道数
-        self.fc_l = nn.Linear(512, num_classes)  #改通道数
-        self.fc_h = nn.Linear(512, num_classes)  #改通道数
+        self.fc = nn.Linear(512, num_classes)
+        self.fc_l = nn.Linear(512, num_classes)
+        self.fc_h = nn.Linear(512, num_classes)
         self.block6 = nn.Sequential( 
                             nn.AvgPool2d(7),
                             Flatten(),
                             )
        
-        self.distangler_H = nn.Sequential(nn.Conv2d(512,512,kernel_size=3,stride=1,padding=1),   #改通道数
+        self.distangler_H = nn.Sequential(nn.Conv2d(512,512,kernel_size=3,stride=1,padding=1),
                           nn.BatchNorm2d(512),
                           nn.ReLU(),
                           )
         
-        self.distangler_L = nn.Sequential(nn.Conv2d(512,512,kernel_size=3,stride=1,padding=1),   #改通道数
+        self.distangler_L = nn.Sequential(nn.Conv2d(512,512,kernel_size=3,stride=1,padding=1),
                           nn.BatchNorm2d(512),
                           nn.ReLU(),
                           )
@@ -142,7 +140,7 @@ class ResNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         out = self.layer4(x)
-        if types == 'L':
+        if types == 'freq':
             L_info = self.distangler_L(out)
             x_L_image = self.decoder_L(L_info) #进行特征解耦
             H_info = self.distangler_H(out)
@@ -154,7 +152,7 @@ class ResNet(nn.Module):
             
             return x_l, x_h, x_L_image, x_H_image
         
-        elif types == 'H':  
+        elif types == 'cls':  
             L_info = self.distangler_L(out)
             L_att = self.spatial_attention(L_info)
             H_info = self.distangler_H(out)
@@ -176,28 +174,6 @@ def resnet18(pretrained=False, **kwargs):
     if pretrained:
         model_dict = model.state_dict()
         pretrained_dict = model_zoo.load_url(model_urls['resnet18'])
-
-        pretrained_dict = {k: v for k, v in pretrained_dict.items() if
-                               k in model_dict and v.size() == model_dict[k].size()}
-
-        print('model dict keys:', len(model_dict.keys()), 'pretrained keys:', len(pretrained_dict.keys()))
-        print('model dict keys:', model_dict.keys(), 'pretrained keys:', pretrained_dict.keys())
-        # 2. overwrite entries in the existing state dict
-        model_dict.update(pretrained_dict)
-        # 3. load the new state dict
-        model.load_state_dict(model_dict)
-    return model
-
-def resnet50(pretrained=False, **kwargs):
-    """Constructs a ResNet-18 model.
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
-    if pretrained:
-        model_dict = model.state_dict()
-        pretrained_dict = model_zoo.load_url(model_urls['resnet50'])
 
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if
                                k in model_dict and v.size() == model_dict[k].size()}

@@ -6,8 +6,6 @@ import torch
 import torch.optim as optim
 from sklearn.metrics import accuracy_score
 import cv2
-# np.set_printoptions(threshold=np.inf)
-
 
 def decoder_image(img, mean, std):
     inputs_decoder = []
@@ -18,13 +16,13 @@ def decoder_image(img, mean, std):
         inputs_decoder.append(ss)
     return np.stack(inputs_decoder)
 
+
 def my_fft(img, threshold):    
     
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
 
     img = decoder_image(img, mean, std)   
-    print('fft_img_shape:', img.shape)    
     img = np.transpose(img, (1, 2, 0))
         
     H,W,C = img.shape
@@ -63,11 +61,12 @@ def my_fft(img, threshold):
 
     return img_H_temp, i_img_L, img_H_temp_ag, i_img_L_ag, threshold
 
+
 def gen_gaussian_noise(image,SNR):
     """
-    :param image: 原始信号
-    :param SNR: 添加噪声的信噪比
-    :return: 生成的噪声
+    :param image: source image
+    :param SNR: Signal-to-noise ratio 
+    :return: noise
     """
     assert len(image.shape) == 3
     H, W, C = image.shape
@@ -75,12 +74,12 @@ def gen_gaussian_noise(image,SNR):
     noise = noise - np.mean(noise)
     image_power=1/(H*W*3)*np.sum(np.power(image,2))
     noise_variance=image_power/np.power(10,(SNR/10))
-    print(noise_variance)
     noise=(np.sqrt(noise_variance)/np.std(noise))*noise
     return noise
 
+
 def my_fft_trans(img1, threshold):
-    #数据预处理
+    #pre-processss
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
 
@@ -96,7 +95,7 @@ def my_fft_trans(img1, threshold):
     fig_abs_temp = np.abs(f1)
     fig_pha_temp = np.angle(f1)
     
-    #高频
+    #add noise
     noise_w_h_p = np.random.uniform(0.8, 1.2, (H,W,1))
     noise_b_h_p = np.random.uniform(-np.pi/6, np.pi/6, (H,W,1))
     fig_pha_ag = noise_w_h_p*fig_pha_temp + noise_b_h_p
@@ -106,23 +105,8 @@ def my_fft_trans(img1, threshold):
     fig_abs_ag = noise_w_h_a*fig_abs_temp + noise_b_h_a
     
     f_ag = fig_abs_ag*np.cos(fig_pha_ag) + fig_abs_ag*np.sin(fig_pha_ag)*1j
-    
-#     #低频
-#     fig_l_abs = fig_abs_temp[crows-threshold:crows+threshold, ccols-threshold:ccols+threshold]
-#     fig_l_pha = fig_pha_temp[crows-threshold:crows+threshold, ccols-threshold:ccols+threshold]
-#     noise_w_l_p = np.random.uniform(0.8, 1.2, (threshold*2,threshold*2,1))
-#     noise_b_l_p = gen_gaussian_noise(fig_l_pha, 30)
-#     fig_l_pha_ag = noise_w_l_p*fig_l_pha + noise_b_l_p
-    
-#     noise_w_l_a = np.random.uniform(0.5, 1.5, (threshold*2,threshold*2,1))
-#     noise_b_l_a = gen_gaussian_noise(fig_l_abs, 30)
-#     fig_l_abs_ag = noise_w_l_a*fig_l_abs + noise_b_l_a
-    
-#     f_ag_l = fshift_l_abs_ag*np.cos(fshift_l_pha_ag) + fshift_l_abs_ag*np.sin(fshift_l_pha_ag)*1j
             
-#     f_ag[crows-threshold:crows+threshold, ccols-threshold:ccols+threshold] = f_ag_l
-            
-    #反变换
+    #ifft
     img_ag = np.fft.ifft2(f_ag, axes=(0,1))
     img_ag = np.abs(img_ag)
     img_ag = np.uint8(np.clip(img_ag, 0, 255))   
@@ -146,12 +130,14 @@ def MMD_Loss_func(num_source, sigmas=None):
         return cost
     return loss
 
+
 def mmd_two_distribution(source, target, sigmas):
     sigmas = torch.tensor(sigmas).cuda()
     xy = rbf_kernel(source, target, sigmas)
     xx = rbf_kernel(source, source, sigmas)
     yy = rbf_kernel(target, target, sigmas)
     return xx + yy - 2 * xy
+
 
 def rbf_kernel(x, y, sigmas):
     sigmas = sigmas.reshape(sigmas.shape + (1,))
@@ -160,6 +146,7 @@ def rbf_kernel(x, y, sigmas):
     dot = -torch.matmul(beta, torch.reshape(dist, (1, -1)))
     exp = torch.mean(torch.exp(dot))
     return exp
+
 
 def compute_pairwise_distances(x, y):
     dist = torch.zeros(x.size(0),y.size(0)).cuda()
@@ -188,8 +175,6 @@ def unfold_label(labels, classes):
 def shuffle_data(samples, labels):
     num = len(labels)
     shuffle_index = np.random.permutation(np.arange(num)) #打乱index
-    print(type(samples))
-    print(type(labels))
     shuffled_samples = samples[shuffle_index]
     shuffled_labels = labels[shuffle_index]
     return shuffled_samples, shuffled_labels
