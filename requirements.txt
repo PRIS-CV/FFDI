@@ -1,0 +1,5 @@
+pytorch==1.8.1
+pip install opencv-python
+h5py==2.10.0
+scikit-learn
+pip install pillow

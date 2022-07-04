@@ -1,0 +1,5 @@
+两个辅助分类器
+
+除了loss梯度值叠加方式与1文件夹中的不一样（但是效果应该是等价的），其余都一样
+
+缓存已备份到/data/wangjingye/DG/paper_result/test_pacs_final_18
