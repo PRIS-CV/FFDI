@@ -4,7 +4,7 @@ Code release for "Domain Generalization via Frequency-domain-based Feature Disen
 
 Part of the code is inherited from [Episodic-DG](https://github.com/HAHA-DL/Episodic-DG).
 
-## Enviroments:
+## Enviroments
 ```bash
 GPU GeForce RTX 1080 Ti
 pytorch==1.9.0
@@ -12,14 +12,14 @@ torchvision==0.10.0
 cudatoolkit==10.2.89
 ```
 
-## Prepare:
-### Datasets:
+## Prepare
+### Datasets
 Please download the [PACS](https://drive.google.com/drive/folders/0B6x7gtvErXgfUU1WcGY5SzdwZVk?resourcekey=0-2fvpQY_QSyJf2uIECzqPuQ&usp=sharing) datasets and use the official train/val split.
 
 ### ImageNet pretrained model
 We use the pytorch pretrained ResNet-18 model from [https://download.pytorch.org/models/resnet18-5c106cde.pth](https://download.pytorch.org/models/resnet18-5c106cde.pth).
 
-## Run:
+## Run
 - Train from scratch with command:
 ```bash
 
