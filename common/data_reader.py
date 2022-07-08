@@ -8,10 +8,10 @@ dirpath = os.pardir
 import sys
 
 sys.path.append(dirpath)
-from common.utils import shuffle_data, my_fft, my_fft_trans
+from common.utils import unfold_label, shuffle_data, my_fft, my_fft_trans
 
 
-class BatchImageGenerator:
+class BatchImageGenerator: #datasets
     def __init__(self, flags, stage, file_path, b_unfold_label):
 
         if stage not in ['train', 'val', 'test']:
@@ -21,7 +21,7 @@ class BatchImageGenerator:
         self.load_data(b_unfold_label)
 
     def configuration(self, flags, stage, file_path):
-        self.batch_size = flags.batch_size
+        self.batch_size = flags.batch_size 
         self.file_path = file_path
         self.stage = stage 
         self.flags = flags 
@@ -30,6 +30,7 @@ class BatchImageGenerator:
 
 
     def normalize(self, inputs):
+
         # the mean and std used for the normalization of
         # the inputs for the pytorch pretrained model
         mean = [0.485, 0.456, 0.406]
@@ -38,9 +39,9 @@ class BatchImageGenerator:
         # norm to [0, 1]
         inputs = inputs / 255.0
 
-        inputs_norm = []
+        inputs_norm = [] #注释了
         for item in inputs:
-            item = np.transpose(item, (2, 0, 1)) #HWC to CHW
+            item = np.transpose(item, (2, 0, 1)) #from hwc to chw
             item_norm = []
             for c, m, s in zip(item, mean, std):
                 c = np.subtract(c, m)

@@ -1,6 +1,11 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+class UnFlatten(nn.Module):
+    def forward(self,input):
+        return input.view(input.size(0),512,4,4)
+
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
@@ -32,12 +37,11 @@ class BasicBlock(nn.Module):
 
     def forward(self, x):
         residual = x
-
         if self.upsample is not None:
             residual_temp = self.upsample(x)
             residual = self.conv0_0(residual_temp)
             residual = self.bn0_0(residual)
-            
+
         if self.flag:
             x = self.conv2(x)
             x = self.conv0_1(x)
@@ -95,7 +99,7 @@ class ResNetDecoder(nn.Module):
 
     def forward(self, x):
                 
-        x = self.layer0(x) #B×256×14×14
+        x = self.layer0(x) #B×512×14×14
         x = self.layer1(x) #B×256×28×28
         x = self.layer2(x) #B×128×56×56
         x = self.layer3(x) #B×64×112×112
@@ -106,6 +110,9 @@ class ResNetDecoder(nn.Module):
         return out
 
 def resnet18_decoder(pretrained=False):
+    """
+    Constructs a ResNet-18 decoder model.
+    """
     model = ResNetDecoder(BasicBlock, [2, 2, 2, 2])
     return model
 

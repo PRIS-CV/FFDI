@@ -19,7 +19,7 @@ def main():
                                   help="")
     train_arg_parser.add_argument("--unseen_index", type=int, default=1,
                                   help="")
-    train_arg_parser.add_argument("--lr", type=float, default=[0.001, 0.01], #特征提取器，低频，高频，分类器
+    train_arg_parser.add_argument("--lr", type=float, default=[0.001, 0.01],
                                   help='')
     train_arg_parser.add_argument("--weight_decay", type=float, default=0.0001,
                                   help='')
@@ -40,11 +40,11 @@ def main():
     
     index = [0,1,2,3]
     styles = ['art','cartoon','photo','sketch',]
-    for times in range(3):
+    for x in range(3):
         for i in index:
             args.unseen_index = i
-            args.logs = 'logs_PACS/{}/attack_{}'.format(str(times),styles[i])
-            args.model_path = 'logs_PACS/{}/attack_{}_model'.format(str(times),styles[i])
+            args.logs = 'logs_PACS/{}/attack_{}'.format(str(x),styles[i])
+            args.model_path = 'logs_PACS/{}/attack_{}_model'.format(str(x),styles[i])
             model_obj = ModelAggregate(flags=args)
             model_obj.train(flags=args)
 

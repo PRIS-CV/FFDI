@@ -7,6 +7,7 @@ import torch.optim as optim
 from sklearn.metrics import accuracy_score
 import cv2
 
+
 def decoder_image(img, mean, std):
     inputs_decoder = []
     for ss, m, s in zip(img, mean, std):
@@ -15,7 +16,6 @@ def decoder_image(img, mean, std):
         ss = ss * 255
         inputs_decoder.append(ss)
     return np.stack(inputs_decoder)
-
 
 def my_fft(img, threshold):    
     
@@ -61,25 +61,23 @@ def my_fft(img, threshold):
 
     return img_H_temp, i_img_L, img_H_temp_ag, i_img_L_ag, threshold
 
-
 def gen_gaussian_noise(image,SNR):
     """
     :param image: source image
-    :param SNR: Signal-to-noise ratio 
+    :param SNR: signal-noise ratio
     :return: noise
     """
     assert len(image.shape) == 3
     H, W, C = image.shape
-    noise=np.random.randn(H, W, 1) # *signal.shape 获取样本序列的尺寸
+    noise=np.random.randn(H, W, 1)
     noise = noise - np.mean(noise)
     image_power=1/(H*W*3)*np.sum(np.power(image,2))
     noise_variance=image_power/np.power(10,(SNR/10))
     noise=(np.sqrt(noise_variance)/np.std(noise))*noise
     return noise
 
-
 def my_fft_trans(img1, threshold):
-    #pre-processss
+    #pre-process
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
 
@@ -114,7 +112,6 @@ def my_fft_trans(img1, threshold):
     img_ag = np.array(Image.fromarray(img_ag).transpose(Image.FLIP_LEFT_RIGHT))
 
     return img_ag
- 
     
 def MMD_Loss_func(num_source, sigmas=None):
     if sigmas is None:
@@ -130,14 +127,12 @@ def MMD_Loss_func(num_source, sigmas=None):
         return cost
     return loss
 
-
 def mmd_two_distribution(source, target, sigmas):
     sigmas = torch.tensor(sigmas).cuda()
     xy = rbf_kernel(source, target, sigmas)
     xx = rbf_kernel(source, source, sigmas)
     yy = rbf_kernel(target, target, sigmas)
     return xx + yy - 2 * xy
-
 
 def rbf_kernel(x, y, sigmas):
     sigmas = sigmas.reshape(sigmas.shape + (1,))
@@ -146,7 +141,6 @@ def rbf_kernel(x, y, sigmas):
     dot = -torch.matmul(beta, torch.reshape(dist, (1, -1)))
     exp = torch.mean(torch.exp(dot))
     return exp
-
 
 def compute_pairwise_distances(x, y):
     dist = torch.zeros(x.size(0),y.size(0)).cuda()
@@ -174,7 +168,7 @@ def unfold_label(labels, classes):
 
 def shuffle_data(samples, labels):
     num = len(labels)
-    shuffle_index = np.random.permutation(np.arange(num)) #打乱index
+    shuffle_index = np.random.permutation(np.arange(num))
     shuffled_samples = samples[shuffle_index]
     shuffled_labels = labels[shuffle_index]
     return shuffled_samples, shuffled_labels
@@ -229,8 +223,8 @@ def fix_python_seed(seed):
 
 def fix_torch_seed(seed):
     print('seed-----------torch', seed)
-    torch.manual_seed(seed) #为cpu设置随机种子
-    torch.cuda.manual_seed_all(seed) #为gpu设置随机种子
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
 def fix_all_seed(seed):

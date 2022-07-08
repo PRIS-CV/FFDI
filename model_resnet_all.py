@@ -25,13 +25,12 @@ class ModelAggregate:
         self.setup(flags)
         self.setup_path(flags)
         self.configure(flags)
-        #归一化时使用的数据
         self.mean = [0.485, 0.456, 0.406]
         self.std = [0.229, 0.224, 0.225]
 
     def setup(self, flags):
         
-        model = resnet_vanilla_updata.resnet18(pretrained=True, num_classes=flags.num_classes, flags=flags)
+        model = resnet_vanilla_updata.resnet18(pretrained=True, num_classes=flags.num_classes, num_domains=flags.num_domains, flags=flags)
     
         if torch.cuda.is_available():
             if torch.cuda.device_count()>1:
@@ -49,7 +48,6 @@ class ModelAggregate:
 
         flags_log = os.path.join(flags.logs, 'flags_log.txt')
         write_log(flags, flags_log)
-
 
     def setup_path(self, flags):
 
@@ -134,7 +132,6 @@ class ModelAggregate:
             # 3. load the new state dict
             nn.load_state_dict(model_dict)
 
-
     def configure(self, flags):
 
         if torch.cuda.device_count()>1:
@@ -171,7 +168,8 @@ class ModelAggregate:
 
             # get the inputs and labels from the data reader
             total_loss = 0.0
-            flag = 0 #是否拼接的标志
+            loss_C_all = 0.0
+            flag = 0
             for index in range(flags.num_domains):
                 images_train, labels_train, H, L = self.batImageGenTrains.get_images_labels_batch(index)
 
@@ -191,17 +189,18 @@ class ModelAggregate:
                     inputs, labels, H, L = Variable(inputs, requires_grad=False).cpu(), \
                                  Variable(labels, requires_grad=False).long().cpu(), \
                                     Variable(H, requires_grad=False).cpu(), \
-                                    Variable(L, requires_grad=False).cpu()                
+                                    Variable(L, requires_grad=False).cpu()
+
                 # forward with the adapted parameters
-                outputs_l_c_a, outputs_h_c_a, outputs_L, outputs_H = self.network(x=inputs, types='freq')
+                outputs_lc, outputs_hc, outputs_L, outputs_H = self.network(x=inputs, types='disentangle')
                 
-                #高频特征学习
+                #extract high-frequency features
                 loss_H_mse = self.loss_fn_MSE(outputs_H, H)
                 
-                #低频特征学习
+                #extract low-frequency features
                 loss_L_mse = self.loss_fn_MSE(outputs_L, L)
                 
-                loss_C_A = self.loss_fn_CE(outputs_l_c_a, labels) + self.loss_fn_CE(outputs_h_c_a, labels)
+                loss_C_A = self.loss_fn_CE(outputs_lc, labels) + self.loss_fn_CE(outputs_hc, labels)
                 
                 total_loss = total_loss + loss_C_A + loss_H_mse + loss_L_mse
                 
@@ -212,7 +211,7 @@ class ModelAggregate:
                     data, image_labels = \
                     torch.cat((data,inputs),0),\
                     torch.cat((image_labels,labels),0)
-            
+                
             # init the grad to zeros first
             self.opt_network.zero_grad()
             # backward your network
@@ -221,7 +220,7 @@ class ModelAggregate:
             shuffle_index = torch.randperm(len(image_labels))
             data, image_labels = data[shuffle_index], image_labels[shuffle_index]
             
-            outputs_c_i, _ = self.network(x=data, types='cls')
+            outputs_c_i, _ = self.network(x=data, types='interact')
             loss_C_I = self.loss_fn_CE(outputs_c_i, image_labels)
 
             # backward your network
@@ -231,14 +230,14 @@ class ModelAggregate:
 
             flags_log = os.path.join(flags.logs, 'loss_log.txt')
             write_log(
-                "total_loss:" + str(total_loss.item()) + "  loss_C:" +str(loss_C_I.item()),
+                "total_loss:" + str(total_loss.item()) + "  loss_C_I:" +str(loss_C_I.item()),
                 flags_log)    
 
             self.scheduler.step(epoch=ite)
             
             if ite < 500 or ite % 500 == 0:
                 print(
-                    'ite:', ite, 'total loss:', total_loss.cpu().item()+loss_C_I.cpu().item(),
+                    'ite:', ite, 'total loss:', total_loss.cpu().item() + loss_C_I.cpu().item(),
                     'lr:', self.opt_network.param_groups[0]['lr'])
                 
             if ite % flags.test_every == 0 and ite is not 0: 
@@ -313,7 +312,7 @@ class ModelAggregate:
                     images_test = Variable(torch.from_numpy(np.array(test_image_split, dtype=np.float32))).cuda()
                 else:
                     images_test = Variable(torch.from_numpy(np.array(test_image_split, dtype=np.float32))).cpu()
-                tuples = self.network(images_test, 'cls')
+                tuples = self.network(images_test, 'interact')
                 
                 predictions = tuples[1]['Predictions']
                 predictions = predictions.cpu().data.numpy()
@@ -327,7 +326,7 @@ class ModelAggregate:
             else:
                 images_test = Variable(torch.from_numpy(np.array(images_test, dtype=np.float32))).cpu()
 
-            tuples = self.network(images_test, 'cls')
+            tuples = self.network(images_test, 'interact')
 
             predictions = tuples[1]['Predictions']
             predictions = predictions.cpu().data.numpy()
