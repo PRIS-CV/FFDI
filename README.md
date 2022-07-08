@@ -1,11 +1,11 @@
 # FFDI
-## Introduction
-Code release for "Domain Generalization via Frequency-domain-based Feature Disentanglement and Interaction" (ACM MM 2022): [https://arxiv.org/abs/2201.08029](https://arxiv.org/abs/2201.08029)
+## 0. Introduction
+Code release for "Domain Generalization via Frequency-domain-based Feature Disentanglement and Interaction" (ACM MM 2022): [https://arxiv.org/abs/2201.08029](https://arxiv.org/abs/2201.08029).
 
 Part of the code is inherited from [Episodic-DG](https://github.com/HAHA-DL/Episodic-DG).
 
 ## 1. Requirements:
-'''
+```bash
 GPU GeForce RTX 1080 Ti
 pytorch==1.9.0
 torchvision==0.10.0
@@ -16,14 +16,14 @@ scikit-learn==0.24.2
 pillow==7.1.2
 scipy==1.7.0
 numpy==1.19.2
-'''
+```
 
 ## 2. Prepare:
 ### Datasets:
 Please download the [PACS](https://drive.google.com/drive/folders/0B6x7gtvErXgfUU1WcGY5SzdwZVk?resourcekey=0-2fvpQY_QSyJf2uIECzqPuQ&usp=sharing) datasets and use the official train/val split.
 
 ### ImageNet pretrained model
-We use the pytorch pretrained ResNet-18 model from [https://download.pytorch.org/models/resnet18-5c106cde.pth](https://download.pytorch.org/models/resnet18-5c106cde.pth)
+We use the pytorch pretrained ResNet-18 model from [https://download.pytorch.org/models/resnet18-5c106cde.pth](https://download.pytorch.org/models/resnet18-5c106cde.pth).
 
 ## 3. Training:
 - Train from scratch with command:
