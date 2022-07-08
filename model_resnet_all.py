@@ -37,8 +37,6 @@ class ModelAggregate:
                 model = torch.nn.DataParallel(model)
             self.network = model.cuda()
         else:
-            print("使用cpu........")
-
             self.network = model.cpu()
 
         print(self.network)
@@ -168,7 +166,6 @@ class ModelAggregate:
 
             # get the inputs and labels from the data reader
             total_loss = 0.0
-            loss_C_all = 0.0
             flag = 0
             for index in range(flags.num_domains):
                 images_train, labels_train, H, L = self.batImageGenTrains.get_images_labels_batch(index)
@@ -247,29 +244,17 @@ class ModelAggregate:
 
         accuracies = []
         for d_index in range(flags.num_domains):
-            accuracy_val = self.test(batImageGenTest=batImageGenVals, flags=flags, ite=ite,
-                                     log_dir=flags.logs, log_prefix='val_index_{}'.format(d_index), d_index=d_index)
+            accuracy_val = self.test(batImageGenTest=batImageGenVals, flags=flags, d_index=d_index)
 
             accuracies.append(accuracy_val)
                         
         mean_acc = np.mean(accuracies)
         
-        f = open(os.path.join(flags.logs, '{}.txt'.format("val_accuracy")), mode='a')
-        f.write('accuracy:{}\n'.format(mean_acc))
-        f.close()
-        
         if mean_acc > self.best_accuracy_val or ite > 1000:
             if mean_acc > self.best_accuracy_val:
                 self.best_accuracy_val = mean_acc
 
-            acc_test = self.test(batImageGenTest=self.batImageGenTest, flags=flags, ite=ite,
-                                 log_dir=flags.logs, log_prefix='dg_test')
-
-            f = open(os.path.join(flags.logs, 'Best_val.txt'), mode='a')
-            f.write(
-                'ite:{}, best val accuracy:{}, test accuracy:{}\n'.format(ite, self.best_accuracy_val,
-                                                                          acc_test))
-            f.close()
+            acc_test = self.test(batImageGenTest=self.batImageGenTest, flags=flags)
 
             if not os.path.exists(flags.model_path):
                 os.makedirs(flags.model_path)
@@ -278,8 +263,13 @@ class ModelAggregate:
                 self.best_accuracy_test = acc_test
                 outfile = os.path.join(flags.model_path, 'best_model.tar')
                 torch.save({'ite': ite, 'state': self.network.state_dict()}, outfile)
+                f = open(os.path.join(flags.logs, 'Best_val.txt'), mode='a')
+                f.write(
+                    'ite:{}, best val accuracy:{}, test accuracy:{}\n'.format(ite, self.best_accuracy_val,
+                                                                            acc_test))
+                f.close()
 
-    def test(self, flags, ite, log_prefix, log_dir='logs/', batImageGenTest=None, d_index=0):
+    def test(self, flags, batImageGenTest=None, d_index=0):
 
         # switch on the network test mode
         self.network.eval()
@@ -332,14 +322,6 @@ class ModelAggregate:
             predictions = predictions.cpu().data.numpy()
 
         accuracy = compute_accuracy(predictions=predictions, labels=labels_test)
-        print('----------accuracy test----------:', accuracy)
-
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-
-        f = open(os.path.join(log_dir, '{}.txt'.format(log_prefix)), mode='a')
-        f.write('ite:{}, accuracy:{}\n'.format(ite, accuracy))
-        f.close()
 
         # switch on the network train mode
         self.network.train()
