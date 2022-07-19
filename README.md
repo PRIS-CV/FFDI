@@ -31,10 +31,10 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python main_agg.py
 
 Please cite the related works in your publications if it helps your research:
 
-    @article{wang2022domain,
-      title={Domain Generalization via Frequency-based Feature Disentanglement and Interaction},
+    @inproceedings{wang2022domain,
+      title={Domain Generalization via Frequency-domain-based Feature Disentanglement and Interaction},
       author={Wang, Jingye and Du, Ruoyi and Chang, Dongliang and Liang, KongMing and Ma, Zhanyu},
-      journal={arXiv preprint arXiv:2201.08029},
+      booktitle={Proceedings of the 30th ACM International Conference on Multimedia},
       year={2022}
     }
 
